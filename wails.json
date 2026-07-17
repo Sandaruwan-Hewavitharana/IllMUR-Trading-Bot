@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/wails.json",
+  "name": "IllMUR",
+  "outputfilename": "IllMUR",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "IllMUR Developer",
+    "email": ""
+  },
+  "info": {
+    "companyName": "IllMUR Systems",
+    "productName": "IllMUR",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2026",
+    "comments": "Automated Trading Bot Interface"
+  }
+}

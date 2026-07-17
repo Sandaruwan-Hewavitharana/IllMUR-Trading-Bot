@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IllMUR — GOLDBOT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --buy:  #C6F87C;
+      --sell: #FF1E56;
+      --hold: #FFAC1C;
+      --bg:   #0B0B0B;
+      --surface: #141414;
+      --border:  #1E1E1E;
+      --muted:   #3A3A3A;
+      --text-dim: #666;
+    }
+
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ─── LOADING ─────────────────────────────────────── */
+    #splash {
+      position: fixed; inset: 0; z-index: 100;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px;
+      transition: opacity .7s ease;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+
+    .bars { display: flex; gap: 7px; }
+    .bar {
+      width: 14px; height: 52px;
+      background: var(--sell);
+      border-radius: 3px;
+      animation: barPulse 1.4s ease-in-out infinite;
+    }
+    .bar:nth-child(1) { animation-delay: 0s; }
+    .bar:nth-child(2) { animation-delay: .25s; }
+    .bar:nth-child(3) { animation-delay: .5s; }
+    @keyframes barPulse {
+      0%,100% { opacity:.25; height:52px; box-shadow: none; }
+      50%      { opacity:1;   height:72px; box-shadow: 0 0 18px var(--sell); }
+    }
+    .splash-label {
+      font-size: 11px; letter-spacing: .25em;
+      color: rgba(255,255,255,.3); text-transform: uppercase;
+    }
+
+    /* ─── LAYOUT ──────────────────────────────────────── */
+    #app {
+      display: flex; width: 100%; height: 100%;
+      opacity: 0; transition: opacity .8s ease;
+    }
+    #app.show { opacity: 1; }
+
+    /* SIDEBAR */
+    #sidebar {
+      width: 64px; min-width: 64px;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      gap: 10px;
+      background: var(--bg);
+      z-index: 10;
+    }
+    .sb-logo {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .sb-btn {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    .sb-btn:hover { border-color: var(--muted); background: #1c1c1c; }
+    .sb-btn.active { border-color: var(--sell) !important; background: rgba(255,30,86,.08) !important; }
+    .sb-btn svg { transition: stroke .3s, opacity .3s; }
+
+    #power-btn { margin-top: auto; }
+    #power-btn.paused { border-color: var(--hold); background: rgba(255,172,28,.08); }
+    #power-btn.paused svg { stroke: var(--hold); }
+
+    /* MAIN */
+    #main {
+      flex: 1; position: relative;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* TOPBAR */
+    #topbar {
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 68px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px;
+      z-index: 5;
+    }
+    #status-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: #111; border: 1px solid #222;
+      border-radius: 999px; padding: 6px 14px;
+      font-size: 12px; font-weight: 500; letter-spacing: .02em;
+      color: #ccc;
+      transition: border-color .4s;
+    }
+    #status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--buy);
+      box-shadow: 0 0 6px var(--buy);
+      animation: dotPulse 2s infinite;
+      transition: background .4s, box-shadow .4s;
+    }
+    #status-dot.paused { background: var(--hold); box-shadow: 0 0 6px var(--hold); animation: none; }
+    @keyframes dotPulse {
+      0%,100% { opacity:1; } 50% { opacity:.4; }
+    }
+    #pair-label {
+      font-size: 13px; font-weight: 700;
+      letter-spacing: .12em; color: #fff;
+    }
+
+    /* SIGNAL STAGE */
+    #stage {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding-bottom: 160px;
+    }
+
+    #icon-wrap {
+      width: 120px; height: 120px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 48px;
+    }
+
+    #signal-svg {
+      width: 100%; height: 100%;
+      overflow: visible;
+      transition: transform .6s cubic-bezier(.34,1.56,.64,1), opacity .4s ease;
+    }
+    #signal-svg path, #signal-svg circle, #signal-svg ellipse {
+      transition: stroke .5s ease, fill .5s ease, d .5s ease;
+    }
+    .signal-transition-out { opacity: 0; transform: scale(.8) rotate(10deg); }
+    .signal-transition-in  { opacity: 1; transform: scale(1)  rotate(0deg); }
+
+    /* METRICS */
+    #metrics {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; text-align: center;
+      opacity: 0; transition: opacity .5s ease;
+    }
+    #metrics.loaded { opacity: 1; }
+    .metric-row { font-size: 15px; letter-spacing: .04em; font-weight: 400; }
+    .metric-label { color: var(--text-dim); margin-right: 6px; }
+    .metric-val { font-weight: 600; transition: color .5s ease; }
+    .divider { color: var(--muted); margin: 0 10px; }
+
+    /* RATIONALE */
+    #rationale-wrap {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 0 24px 24px;
+      display: flex; justify-content: center;
+    }
+    #rationale-box {
+      max-width: 580px; width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      background: rgba(255,255,255,.02);
+      display: flex; flex-direction: column; gap: 8px;
+      transition: border-color .5s ease;
+    }
+    #rationale-inner { display: flex; gap: 10px; align-items: flex-start; }
+    #rationale-icon svg { flex-shrink: 0; margin-top: 1px; transition: stroke .5s ease; }
+    #rationale-text {
+      font-size: 12.5px; line-height: 1.65;
+      color: #aaa; font-weight: 400;
+      overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      transition: -webkit-line-clamp .3s;
+    }
+    #rationale-text.expanded { -webkit-line-clamp: unset; display: block; }
+    #see-more-btn {
+      display: none;
+      align-self: flex-end;
+      font-size: 11px; font-weight: 500;
+      color: var(--text-dim);
+      cursor: pointer;
+      letter-spacing: .04em;
+      background: none; border: none; padding: 0;
+      transition: color .2s;
+    }
+    #see-more-btn:hover { color: #fff; }
+
+    /* LOG PANEL */
+    #log-panel {
+      position: absolute; inset: 0;
+      background: var(--bg);
+      z-index: 20;
+      display: flex; flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform .35s cubic-bezier(.4,0,.2,1);
+    }
+    #log-panel.open { transform: translateX(0); }
+    #log-header {
+      height: 56px; min-height: 56px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      font-size: 12px; font-weight: 600;
+      letter-spacing: .08em; color: #555;
+      text-transform: uppercase;
+    }
+    #log-close {
+      width: 28px; height: 28px; border-radius: 7px;
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; background: var(--surface);
+      transition: border-color .2s;
+    }
+    #log-close:hover { border-color: var(--muted); }
+    #log-body {
+      flex: 1; overflow-y: auto;
+      padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 4px;
+      font-family: 'Inter', monospace;
+      font-size: 11.5px;
+    }
+    #log-body::-webkit-scrollbar { width: 4px; }
+    #log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .log-entry {
+      display: flex; gap: 10px; align-items: baseline;
+      padding: 5px 8px; border-radius: 6px;
+      transition: background .15s;
+      line-height: 1.5;
+    }
+    .log-entry:hover { background: rgba(255,255,255,.03); }
+    .log-time { color: var(--text-dim); font-size: 10px; min-width: 52px; flex-shrink: 0; }
+    .log-badge {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase;
+      padding: 1px 5px; border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .badge-STEP    { background: rgba(255,255,255,.07); color: #888; }
+    .badge-INFO    { background: rgba(100,160,255,.12); color: #6ab0ff; }
+    .badge-SUCCESS { background: rgba(198,248,124,.12); color: var(--buy); }
+    .badge-ERROR   { background: rgba(255,30,86,.15);   color: var(--sell); }
+    .badge-WARN    { background: rgba(255,172,28,.12);  color: var(--hold); }
+    .log-msg { color: #999; flex: 1; word-break: break-all; }
+
+    #log-empty {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 10px; color: var(--text-dim);
+      font-size: 12px; letter-spacing: .06em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ SPLASH ═══════════════════════════════════════════════ -->
+<div id="splash">
+  <div class="bars">
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+  </div>
+  <div class="splash-label">Initializing IllMUR</div>
+</div>
+
+<!-- ═══ APP ══════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <!-- Brand Logo: 3 red bars (mini) -->
+    <div class="sb-logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <rect x="1"  y="4" width="5" height="14" rx="1.5" fill="#FF1E56"/>
+        <rect x="8"  y="0" width="5" height="22" rx="1.5" fill="#FF1E56"/>
+        <rect x="15" y="6" width="5" height="10" rx="1.5" fill="#FF1E56"/>
+      </svg>
+    </div>
+
+    <!-- Home -->
+    <div class="sb-btn active" id="home-btn" title="Dashboard">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF1E56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    </div>
+
+    <!-- Terminal / Logs -->
+    <div class="sb-btn" id="terminal-btn" title="Live Logs">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 17 10 11 4 5"/>
+        <line x1="12" y1="19" x2="20" y2="19"/>
+      </svg>
+    </div>
+
+    <!-- Settings -->
+    <div class="sb-btn" id="settings-btn" title="Configuration">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </div>
+
+    <!-- Power / Pause -->
+    <div class="sb-btn" id="power-btn" title="Pause / Resume Bot">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF1E56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="power-icon">
+        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+        <line x1="12" y1="2" x2="12" y2="12"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <div style="width:80px"></div>
+      <div id="status-badge">
+        <span id="status-text">Connected</span>
+        <div id="status-dot"></div>
+      </div>
+      <div id="pair-label">XAUUSD</div>
+    </div>
+
+    <!-- SIGNAL STAGE -->
+    <div id="stage">
+
+      <div id="icon-wrap">
+        <svg id="signal-svg" viewBox="0 0 100 100">
+          <!-- Default HOLD: circle -->
+          <circle cx="50" cy="50" r="28" stroke="#FFAC1C" stroke-width="7" fill="none"/>
+        </svg>
+      </div>
+
+      <div id="metrics">
+        <div class="metric-row">
+          <span class="metric-label">Entry</span>
+          <span class="metric-val" id="entry-val" style="color:var(--hold)">—</span>
+        </div>
+        <div class="metric-row" style="display:flex;align-items:center;">
+          <span class="metric-label">SL</span>
+          <span class="metric-val" id="sl-val" style="color:var(--hold)">—</span>
+          <span class="divider">|</span>
+          <span class="metric-label">TP</span>
+          <span class="metric-val" id="tp-val" style="color:var(--hold)">—</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RATIONALE -->
+    <div id="rationale-wrap">
+      <div id="rationale-box">
+        <div id="rationale-inner">
+          <div id="rationale-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFAC1C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <span id="rationale-text">Initializing... waiting for first signal sweep.</span>
+        </div>
+        <button id="see-more-btn">See more ↓</button>
+      </div>
+    </div>
+
+    <!-- LOG PANEL (slides in) -->
+    <div id="log-panel">
+      <div id="log-header">
+        <span>Live Logs</span>
+        <div id="log-close">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+      </div>
+      <div id="log-body">
+        <div id="log-empty">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5" stroke-linecap="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>No logs yet...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS MODAL (slides in from bottom) -->
+    <div id="settings-modal" style="position:absolute; inset:0; background:var(--bg); z-index:30; display:flex; flex-direction:column; transform:translateY(100%); transition:transform .35s cubic-bezier(.4,0,.2,1);">
+      <div id="settings-header" style="height:56px; min-height:56px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 20px; font-size:12px; font-weight:600; letter-spacing:.08em; color:#fff; text-transform:uppercase;">
+        <span>Configuration</span>
+        <div id="settings-close" style="width:28px; height:28px; border-radius:7px; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; background:var(--surface);">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+      </div>
+      <div id="settings-body" style="flex:1; overflow-y:auto; padding:24px 32px; display:flex; flex-direction:column; gap:24px;">
+        
+        <div class="setting-group">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+            <label style="font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.1em;">Gemini API Keys (Primary)</label>
+            <span style="font-size:10px; color:var(--buy);">Preferred Engine</span>
+          </div>
+          <p style="font-size:11px; color:#666; margin-bottom:10px; line-height:1.4;">Add one key per line. If a key hits rate limits (429), the bot will automatically try the next key.</p>
+          <textarea id="gemini-keys" rows="3" style="width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px; color:#fff; font-family:monospace; font-size:11px; resize:vertical; outline:none; transition:border-color .2s;" placeholder="AIzaSy..."></textarea>
+        </div>
+
+        <div class="setting-group">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+            <label style="font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.1em;">Mistral API Keys (Fallback)</label>
+            <span style="font-size:10px; color:var(--hold);">Backup Engine</span>
+          </div>
+          <p style="font-size:11px; color:#666; margin-bottom:10px; line-height:1.4;">Add one key per line. Used if all Gemini keys fail.</p>
+          <textarea id="mistral-keys" rows="2" style="width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px; color:#fff; font-family:monospace; font-size:11px; resize:vertical; outline:none; transition:border-color .2s;" placeholder="sk-..."></textarea>
+        </div>
+
+        <div style="margin-top:auto; padding-top:10px; border-top:1px solid var(--border); display:flex; justify-content:flex-end;">
+          <button id="save-settings-btn" style="background:#fff; color:#000; font-weight:600; font-size:12px; padding:10px 20px; border-radius:6px; cursor:pointer; border:none; transition:background .2s;">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/wailsjs/runtime/runtime.js"></script>
+<script>
+  // ─── STATE ────────────────────────────────────────────────
+  let currentSignal = 'HOLD';
+  let isPaused = false;
+  let logCount = 0;
+  let rationaleExpanded = false;
+  let fullRationaleText = '';
+
+  const COLORS = { BUY: '#C6F87C', SELL: '#FF1E56', HOLD: '#FFAC1C' };
+
+  // ─── SVG SHAPES ──────────────────────────────────────────
+  function svgFor(type) {
+    const c = COLORS[type];
+    if (type === 'BUY') return `
+      <line x1="50" y1="80" x2="50" y2="20" stroke="${c}" stroke-width="7" stroke-linecap="round"/>
+      <polyline points="28,42 50,20 72,42" stroke="${c}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+    if (type === 'SELL') return `
+      <line x1="50" y1="20" x2="50" y2="80" stroke="${c}" stroke-width="7" stroke-linecap="round"/>
+      <polyline points="28,58 50,80 72,58" stroke="${c}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+    return `<circle cx="50" cy="50" r="28" stroke="${c}" stroke-width="7" fill="none"/>`;
+  }
+
+  // ─── SPLASH ───────────────────────────────────────────────
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hide');
+    setTimeout(() => {
+      document.getElementById('splash').style.display = 'none';
+      const app = document.getElementById('app');
+      app.classList.add('show');
+      document.getElementById('metrics').classList.add('loaded');
+    }, 750);
+  }, 3200);
+
+  // ─── SIDEBAR NAVIGATION ───────────────────────────────────
+  const homeBtn     = document.getElementById('home-btn');
+  const terminalBtn = document.getElementById('terminal-btn');
+  const powerBtn    = document.getElementById('power-btn');
+  const logPanel    = document.getElementById('log-panel');
+  const logClose    = document.getElementById('log-close');
+
+  terminalBtn.addEventListener('click', () => {
+    logPanel.classList.add('open');
+    terminalBtn.classList.add('active');
+    terminalBtn.querySelector('svg').setAttribute('stroke', '#FF1E56');
+    homeBtn.classList.remove('active');
+  });
+
+  function closeLog() {
+    logPanel.classList.remove('open');
+    terminalBtn.classList.remove('active');
+    terminalBtn.querySelector('svg').setAttribute('stroke', '#555');
+    homeBtn.classList.add('active');
+  }
+  logClose.addEventListener('click', closeLog);
+  homeBtn.addEventListener('click', closeLog);
+
+  // ─── PAUSE TOGGLE ─────────────────────────────────────────
+  powerBtn.addEventListener('click', () => {
+    window.go.main.App.TogglePause().then(nowPaused => {
+      isPaused = nowPaused;
+    });
+  });
+
+  window.runtime.EventsOn('pause-state-event', (paused) => {
+    isPaused = paused;
+    const dot  = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const icon = document.getElementById('power-icon');
+
+    if (paused) {
+      powerBtn.classList.add('paused');
+      dot.classList.add('paused');
+      text.textContent = 'Paused';
+      icon.setAttribute('stroke', '#FFAC1C');
+    } else {
+      powerBtn.classList.remove('paused');
+      dot.classList.remove('paused');
+      text.textContent = 'Connected';
+      icon.setAttribute('stroke', '#FF1E56');
+    }
+  });
+
+  // ─── SIGNAL UPDATE ────────────────────────────────────────
+  window.runtime.EventsOn('new-signal-event', (data) => {
+    updateSignal(data);
+  });
+
+  function updateSignal(data) {
+    const type   = (data.signal || 'HOLD').toUpperCase();
+    const color  = COLORS[type] || COLORS.HOLD;
+    const svg    = document.getElementById('signal-svg');
+
+    // Animate out → swap → animate in
+    svg.style.opacity   = '0';
+    svg.style.transform = 'scale(0.75)';
+    setTimeout(() => {
+      svg.innerHTML = svgFor(type);
+      svg.style.transition = 'opacity .45s ease, transform .45s cubic-bezier(.34,1.56,.64,1)';
+      svg.style.opacity   = '1';
+      svg.style.transform = 'scale(1)';
+    }, 300);
+
+    // Metrics
+    const entry = data.entry_range
+      ? `${data.entry_range.min.toFixed(2)} – ${data.entry_range.max.toFixed(2)}`
+      : '—';
+    const sl = data.stop_loss   ? data.stop_loss.toFixed(2) : '—';
+    const tp = (data.take_profit && data.take_profit.length)
+      ? data.take_profit[0].toFixed(2) : '—';
+
+    document.getElementById('entry-val').style.color = color;
+    document.getElementById('sl-val').style.color    = color;
+    document.getElementById('tp-val').style.color    = color;
+    document.getElementById('entry-val').textContent = entry;
+    document.getElementById('sl-val').textContent    = sl;
+    document.getElementById('tp-val').textContent    = tp;
+
+    // Rationale
+    fullRationaleText = data.analysis_rationale || '';
+    rationaleExpanded = false;
+    const rt = document.getElementById('rationale-text');
+    const rb = document.getElementById('rationale-box');
+    const ri = document.getElementById('rationale-icon').querySelector('svg');
+    const sm = document.getElementById('see-more-btn');
+
+    rt.classList.remove('expanded');
+    rt.textContent = fullRationaleText;
+    rb.style.borderColor = color + '33';
+    ri.setAttribute('stroke', color);
+
+    // Show "See more" if text overflows 2 lines
+    setTimeout(() => {
+      const overflowing = rt.scrollHeight > rt.clientHeight + 2;
+      sm.style.display = overflowing ? 'block' : 'none';
+      sm.textContent   = 'See more ↓';
+    }, 50);
+
+    currentSignal = type;
+  }
+
+  // ─── SEE MORE ─────────────────────────────────────────────
+  document.getElementById('see-more-btn').addEventListener('click', () => {
+    const rt = document.getElementById('rationale-text');
+    const sm = document.getElementById('see-more-btn');
+    rationaleExpanded = !rationaleExpanded;
+    rt.classList.toggle('expanded', rationaleExpanded);
+    sm.textContent = rationaleExpanded ? 'See less ↑' : 'See more ↓';
+  });
+
+  // ─── SETTINGS LOGIC ───────────────────────────────────────
+  const settingsBtn   = document.getElementById('settings-btn');
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsClose = document.getElementById('settings-close');
+  const geminiKeysInput = document.getElementById('gemini-keys');
+  const mistralKeysInput = document.getElementById('mistral-keys');
+  const saveSettingsBtn = document.getElementById('save-settings-btn');
+  let currentConfig = null;
+
+  settingsBtn.addEventListener('click', () => {
+    window.go.main.App.GetSettings().then(cfg => {
+      currentConfig = cfg;
+      geminiKeysInput.value = (cfg.gemini_keys || []).join('\n');
+      mistralKeysInput.value = (cfg.mistral_keys || []).join('\n');
+      
+      settingsModal.style.transform = 'translateY(0)';
+      settingsBtn.classList.add('active');
+      settingsBtn.querySelector('svg').setAttribute('stroke', '#FF1E56');
+    });
+  });
+
+  function closeSettings() {
+    settingsModal.style.transform = 'translateY(100%)';
+    settingsBtn.classList.remove('active');
+    settingsBtn.querySelector('svg').setAttribute('stroke', '#555');
+  }
+  settingsClose.addEventListener('click', closeSettings);
+
+  saveSettingsBtn.addEventListener('click', () => {
+    if (!currentConfig) return;
+    
+    const gemKeys = geminiKeysInput.value.split('\n').map(k => k.trim()).filter(k => k);
+    const misKeys = mistralKeysInput.value.split('\n').map(k => k.trim()).filter(k => k);
+    
+    currentConfig.gemini_keys = gemKeys;
+    currentConfig.mistral_keys = misKeys;
+
+    saveSettingsBtn.textContent = 'Saving...';
+    window.go.main.App.SaveSettings(currentConfig).then(() => {
+      saveSettingsBtn.textContent = 'Saved!';
+      setTimeout(() => {
+        saveSettingsBtn.textContent = 'Save Settings';
+        closeSettings();
+      }, 1000);
+    }).catch(err => {
+      saveSettingsBtn.textContent = 'Error!';
+      console.error(err);
+      setTimeout(() => saveSettingsBtn.textContent = 'Save Settings', 2000);
+    });
+  });
+
+  // ─── LOG EVENTS ───────────────────────────────────────────
+  window.runtime.EventsOn('log-event', (data) => {
+    appendLog(data.level, data.time, data.message);
+  });
+
+  function appendLog(level, time, msg) {
+    const body  = document.getElementById('log-body');
+    const empty = document.getElementById('log-empty');
+    if (empty) empty.style.display = 'none';
+
+    logCount++;
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `
+      <span class="log-time">${time || '--:--:--'}</span>
+      <span class="log-badge badge-${level}">${level}</span>
+      <span class="log-msg">${escapeHTML(msg)}</span>
+    `;
+    body.appendChild(entry);
+    // Auto-scroll to bottom
+    body.scrollTop = body.scrollHeight;
+
+    // Keep max 200 entries to prevent memory bloat
+    while (body.children.length > 201) {
+      body.removeChild(body.children[1]); // keep empty div at [0]
+    }
+  }
+
+  function escapeHTML(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>

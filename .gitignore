@@ -1,0 +1,18 @@
+# Build artifacts
+build/bin/*
+!build/bin/.gitkeep
+*.exe
+*.syso
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment variables
+.env
+settings.json
+*.local
+
+# Chrome User Data
+isolated_bot_data/
+user_data/
