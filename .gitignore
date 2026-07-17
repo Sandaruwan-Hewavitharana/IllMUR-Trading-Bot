@@ -16,3 +16,4 @@ settings.json
 # Chrome User Data
 isolated_bot_data/
 user_data/
+build/ 
